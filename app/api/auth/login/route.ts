@@ -1,27 +1,20 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
-import bcrypt from "bcryptjs";
 import { signToken } from "@/lib/auth";
 
 export async function POST(req: Request) {
-  const { email, password } = await req.json();
+  const { email } = await req.json();
 
   const result = await pool.query(
-    "SELECT * FROM employees WHERE email=$1 AND is_active=true",
+    "SELECT id, name, role FROM employees WHERE email=$1 AND is_active=true",
     [email]
   );
 
   if (result.rows.length === 0) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    return NextResponse.json({ error: "User not found" }, { status: 401 });
   }
 
   const user = result.rows[0];
-
-  // ✅ FIX HERE
-  const isValid = await bcrypt.compare(password, user.password);
-  if (!isValid) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
-  }
 
   const token = signToken({
     id: user.id,
