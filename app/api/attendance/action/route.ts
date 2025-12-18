@@ -6,7 +6,6 @@ import { pool } from "@/lib/db";
 interface TokenPayload {
   id: string;
   role: string;
-  name: string;
 }
 
 export async function POST(req: Request) {
@@ -23,12 +22,16 @@ export async function POST(req: Request) {
     }
 
     const { action } = await req.json();
-    const today = new Date().toISOString().split("T")[0];
 
     const { rows } = await pool.query(
-      `SELECT * FROM attendance
-       WHERE employee_id = $1 AND attendance_date = $2`,
-      [user.id, today]
+      `
+      SELECT *
+      FROM attendance
+      WHERE employee_id = $1
+        AND date = CURRENT_DATE
+      LIMIT 1
+      `,
+      [user.id]
     );
 
     const record = rows[0];
@@ -43,14 +46,16 @@ export async function POST(req: Request) {
         }
 
         await pool.query(
-          `INSERT INTO attendance (employee_id, attendance_date, check_in, status)
-           VALUES ($1, $2, NOW(), 'Present')`,
-          [user.id, today]
+          `
+          INSERT INTO attendance (employee_id, date, check_in, status)
+          VALUES ($1, CURRENT_DATE, NOW(), 'working')
+          `,
+          [user.id]
         );
         break;
 
       case "start_break":
-        if (!record?.check_in || record?.break_start) {
+        if (!record?.check_in || record?.status === "on_break") {
           return NextResponse.json(
             { error: "Invalid break start" },
             { status: 400 }
@@ -58,15 +63,19 @@ export async function POST(req: Request) {
         }
 
         await pool.query(
-          `UPDATE attendance
-           SET break_start = NOW()
-           WHERE employee_id = $1 AND attendance_date = $2`,
-          [user.id, today]
+          `
+          UPDATE attendance
+          SET break_start = NOW(),
+              status = 'on_break'
+          WHERE employee_id = $1
+            AND date = CURRENT_DATE
+          `,
+          [user.id]
         );
         break;
 
       case "end_break":
-        if (!record?.break_start || record?.break_end) {
+        if (record?.status !== "on_break") {
           return NextResponse.json(
             { error: "Invalid break end" },
             { status: 400 }
@@ -74,11 +83,14 @@ export async function POST(req: Request) {
         }
 
         await pool.query(
-          `UPDATE attendance
-           SET break_end = NOW(),
-               break_minutes = EXTRACT(EPOCH FROM (NOW() - break_start)) / 60
-           WHERE employee_id = $1 AND attendance_date = $2`,
-          [user.id, today]
+          `
+          UPDATE attendance
+          SET break_start = NULL,
+              status = 'working'
+          WHERE employee_id = $1
+            AND date = CURRENT_DATE
+          `,
+          [user.id]
         );
         break;
 
@@ -91,15 +103,14 @@ export async function POST(req: Request) {
         }
 
         await pool.query(
-          `UPDATE attendance
-           SET check_out = NOW(),
-               gross_hours = EXTRACT(EPOCH FROM (NOW() - check_in)) / 3600,
-               net_hours =
-                 EXTRACT(EPOCH FROM (NOW() - check_in)) / 3600
-                 - COALESCE(break_minutes, 0) / 60,
-               status = 'Completed'
-           WHERE employee_id = $1 AND attendance_date = $2`,
-          [user.id, today]
+          `
+          UPDATE attendance
+          SET check_out = NOW(),
+              status = 'completed'
+          WHERE employee_id = $1
+            AND date = CURRENT_DATE
+          `,
+          [user.id]
         );
         break;
 
