@@ -10,8 +10,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    const today = new Date().toISOString().split("T")[0];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+      id: string;
+    };
 
     const result = await pool.query(
       `
@@ -19,18 +20,20 @@ export async function GET() {
         check_in,
         check_out,
         break_start,
-        break_end,
-        break_minutes,
         status
       FROM attendance
       WHERE employee_id = $1
-        AND attendance_date = $2
+        AND date = CURRENT_DATE
+      LIMIT 1
       `,
-      [decoded.id, today]
+      [decoded.id]
     );
 
     if (result.rowCount === 0) {
-      return NextResponse.json({ checkedIn: false });
+      return NextResponse.json({
+        checkedIn: false,
+        status: "absent",
+      });
     }
 
     const row = result.rows[0];
@@ -38,8 +41,7 @@ export async function GET() {
     return NextResponse.json({
       checkedIn: !!row.check_in,
       checkedOut: !!row.check_out,
-      onBreak: !!row.break_start && !row.break_end,
-      breakTaken: row.break_minutes > 0,
+      onBreak: row.status === "on_break",
       status: row.status,
     });
   } catch (err) {
