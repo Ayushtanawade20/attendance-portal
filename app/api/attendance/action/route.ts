@@ -66,6 +66,7 @@ export async function POST(req: Request) {
           `
           UPDATE attendance
           SET break_start = NOW(),
+              break_end = NULL,
               status = 'on_break'
           WHERE employee_id = $1
             AND date = CURRENT_DATE
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
         await pool.query(
           `
           UPDATE attendance
-          SET break_start = NULL,
+          SET break_end = NOW(),
               status = 'working'
           WHERE employee_id = $1
             AND date = CURRENT_DATE

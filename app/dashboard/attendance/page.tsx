@@ -11,6 +11,7 @@ interface AttendanceRecord {
   check_in: string | null;
   check_out: string | null;
   break_start: string | null;
+  break_end?: string | null;
   status: string | null;
 }
 
@@ -26,7 +27,22 @@ function formatTime(value?: string | null) {
   return new Date(value).toLocaleTimeString();
 }
 
-function calculateNetHours(checkIn?: string | null, checkOut?: string | null) {
+function calculateBreakMinutes(start?: string | null, end?: string | null) {
+  if (!start || !end) return 0;
+
+  const s = new Date(start).getTime();
+  const e = new Date(end).getTime();
+
+  if (isNaN(s) || isNaN(e)) return 0;
+
+  return Math.round((e - s) / 60000);
+}
+
+function calculateNetHours(
+  checkIn?: string | null,
+  checkOut?: string | null,
+  breakMinutes: number = 0
+) {
   if (!checkIn || !checkOut) return "--";
 
   const start = new Date(checkIn).getTime();
@@ -34,7 +50,8 @@ function calculateNetHours(checkIn?: string | null, checkOut?: string | null) {
 
   if (isNaN(start) || isNaN(end)) return "--";
 
-  const hours = (end - start) / (1000 * 60 * 60);
+  const hours = (end - start) / (1000 * 60 * 60) - breakMinutes / 60;
+
   return hours.toFixed(2);
 }
 
@@ -101,29 +118,34 @@ export default function AttendancePage() {
               </tr>
             )}
 
-            {records.map((r, i) => (
-              <tr key={i} className="border-t hover:bg-gray-50">
-                <td className="px-6 py-4">{r.employee_name ?? "--"}</td>
+            {records.map((r, i) => {
+              const breakMinutes = calculateBreakMinutes(
+                r.break_start,
+                r.break_end
+              );
 
-                <td className="px-6 py-4">{formatDate(r.date)}</td>
+              return (
+                <tr key={i} className="border-t hover:bg-gray-50">
+                  <td className="px-6 py-4">{r.employee_name ?? "--"}</td>
 
-                <td className="px-6 py-4">{formatTime(r.check_in)}</td>
+                  <td className="px-6 py-4">{formatDate(r.date)}</td>
 
-                <td className="px-6 py-4">{formatTime(r.check_out)}</td>
+                  <td className="px-6 py-4">{formatTime(r.check_in)}</td>
 
-                <td className="px-6 py-4">
-                  {r.status === "on_break" ? "In break" : 0}
-                </td>
+                  <td className="px-6 py-4">{formatTime(r.check_out)}</td>
 
-                <td className="px-6 py-4">
-                  {calculateNetHours(r.check_in, r.check_out)}
-                </td>
+                  <td className="px-6 py-4">{breakMinutes}</td>
 
-                <td className="px-6 py-4">
-                  <StatusBadge status={r.status} />
-                </td>
-              </tr>
-            ))}
+                  <td className="px-6 py-4">
+                    {calculateNetHours(r.check_in, r.check_out, breakMinutes)}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <StatusBadge status={r.status} />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
