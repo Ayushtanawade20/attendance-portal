@@ -21,13 +21,15 @@ export async function GET() {
     const result = await pool.query(
       `
       SELECT
-        e.id AS employee_id,
-        e.name AS employee_name,
-        a.date,
-        a.check_in,
-        a.check_out,
-        a.break_start,
-        COALESCE(a.status, 'Absent') AS status
+  e.id AS employee_id,
+  e.name AS employee_name,
+  a.date,
+  a.check_in,
+  a.check_out,
+  a.break_start,
+  a.break_end,
+  COALESCE(a.status, 'Absent') AS status
+
       FROM employees e
       LEFT JOIN attendance a
         ON e.id = a.employee_id
